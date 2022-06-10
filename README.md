@@ -44,3 +44,8 @@ Algorithms
 ### Deletion
 
 **TODO**
+
+License
+-------
+
+This repository will remain private until it's ready to show the world (or I run out of free Github Actions compute or storage).
