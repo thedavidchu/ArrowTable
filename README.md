@@ -13,9 +13,9 @@ The purpose of this repository is two-fold. First, I have been meaning to explor
 Definitions
 -----------
 
-* **Key** : a key is ... (c.f. Python).
-* **Value** : a value is ... (c.f. Python).
-* **Hashcode** : a hashcode is ...
+* **Key** : a key is what is used to have a fast lookup (c.f. Python).
+* **Value** : a value is what is associated with a key (c.f. Python).
+* **Hashcode** : a hashcode is the computed hash value that is deterministically computed from the key.
 * **Item** : an item is the collection of key-value-hashcode as well as the offset (see below).
 
 * **Hash Table** : (abbrev "table") This word is overloaded. It can either refer to the whole table data structure or just the table of items.
