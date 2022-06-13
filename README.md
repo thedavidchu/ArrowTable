@@ -35,12 +35,75 @@ Data Structure
 
 **TODO**
 
+```rust
+/// Given the types KeyType and ValueType as generics:
+
+struct TableItem {
+    offset: either {INVALID, usize},
+    
+    item: either {
+        INVALID, 
+        {hashcode: usize, key: KeyType, value: ValueType}
+    },
+};
+
+struct Table {
+    table: vector<TableItem>,  // All set to INVALID
+    len: usize,
+    cap: usize,
+};
+```
+
+
 Algorithms
 ----------
 
 ### Insertion
 
-**TODO**
+```ts
+/// Let TableInstance[index] return the `index` element of TableInstance.table.
+
+function get_number_belonging_to_home(self: Table, home: usize) -> usize {
+    if self.table[home].offset != INVALID and self.table[home + 1].offset != INVALID {
+        return (home + self.table[home].offset) - (home + 1 + self.table[home + 1].offset);
+    }
+    return 0;
+}
+
+function insertion(self: Table, key: KeyType, value: ValueType) -> Result<bool, ErrMsg> {
+    let hashcode: usize = hash of key;
+    let home: usize = first searched index based on the hashcode;
+    
+    if number_belonging_to_home(self, home) > 0 {
+        let start: usize = home + self.table[home].offset;
+        let end: usize = home + 1 + self.table[home + 1].offset;
+        
+        if key_between(start, end) { // Not including `end` (`end` is the first of the next)
+            change_value_of(key);
+            return FOUND_KEY;
+        }
+        
+        // generic insert at `end`
+        goto generic_insert;
+    } else if self.table[home].offset != INVALID { // home is end for other square
+        if END_CONDITION {
+            put (key, value, hashcode) at end;
+            return KEY_NOT_FOUND;
+        }
+        goto generic_insert;
+    } else { // home.offset is INVALID
+        goto generic_insert;
+    }
+    
+generic_insert:
+    // Recursive algorithm until END_CONDITION (empty spot with no need to displace other items)
+        1. find first (home + i) for all i in {1..self.len-1} s.t. (home + i).offset != INVALID -- i.e. first valid offset
+        2. insert recursively, expecting not to find key
+        3. increment (HOME+i).offset
+
+    return KEY_NOT_FOUND;
+}
+```
 
 ### Search
 
