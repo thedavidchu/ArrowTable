@@ -1,5 +1,5 @@
-ArrowTable :: A Modified Robin Hood Hash Table
-==============================
+ArrowTable - A Modified Robin Hood Hash Table
+=============================================
 
 This repository contains a Rust implementation of a modified Robin Hood hash table. Instead of storing the offset from the ideal position, we invert this idea and for each 'home' location, we store the offset to the first of its item.
 
