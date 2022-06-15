@@ -64,6 +64,8 @@ The following definitions may be a bit circular.
 * **Dense (Item) Lookup (Table)** : this is simply an expandable array that stores the items (i.e. hashcode, key, value). There may be missing values (which Rust will not like).
 * **Secondary Index** : the index used to find items in the **dense item lookup table**.
 
+### Optimizations
+
 * Python compact dict
   * Store the hash (or some part of the hash) here so we can skip ones that definitely don't match (use part not required to compute "home" if using a subset, because we've already clusted with the bits used to compute the "home")
   * Store the arrow in the lookup table. This increases the amount of memory we need to load from cache, but also if we don't get an immediate hit, then this is no good.
