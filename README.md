@@ -57,10 +57,12 @@ This is a list of potential optimizations. Not every "optimization" is a good id
 
 ### Definitions
 
-**Sparse (Index) Lookup (Table)** : this is the sparse lookup where a hash code is converted to an **primary index** that we use to lookup a **secondary index** that will be used to find the corresponding item in the **dense item lookup table** (see below). This is what one thinks of as a conventional hash table.
-**Primary Index** : the index used to find **secondary indices** in the **sparse index lookup table**.
-**Dense (Item) Lookup (Table)** : this is simply an expandable array that stores the items (i.e. hashcode, key, value). There may be missing values (which Rust will not like).
-**Secondary Index** : the index used to find items in the **dense item lookup table**.
+The following definitions may be a bit circular.
+
+* **Sparse (Index) Lookup (Table)** : this is the sparse lookup where a hash code is converted to an **primary index** that we use to lookup a **secondary index** that will be used to find the corresponding item in the **dense item lookup table** (see below). This is what one thinks of as a conventional hash table.
+* **Primary Index** : the index used to find **secondary indices** in the **sparse index lookup table**.
+* **Dense (Item) Lookup (Table)** : this is simply an expandable array that stores the items (i.e. hashcode, key, value). There may be missing values (which Rust will not like).
+* **Secondary Index** : the index used to find items in the **dense item lookup table**.
 
 * Python compact dict
   * Store the hash (or some part of the hash) here so we can skip ones that definitely don't match (use part not required to compute "home" if using a subset, because we've already clusted with the bits used to compute the "home")
