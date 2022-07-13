@@ -1,10 +1,12 @@
 #pragma once
 
+#include <assert.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <stddef.h>
 
-#define EMPTY ((size_t)-2)
-#define INVALID ((size_t)-1)
+#define EMPTY ((size_t)-1)
+#define NOWHERE ((size_t)-2)
 
 #define GROWTH_THRESHOLD ((double)0.8)
 
@@ -38,6 +40,13 @@ int tbl_init(Table *const me, size_t cap) {
         return -1;
     }
 
+    if (cap == 0) {
+        me->len = 0;
+        me->cap = 0;
+        me->table = NULL;
+        return 0;
+    }
+
     me->table = (TableItem *)malloc(size);
     if (me->table == NULL) {
         return -1;
@@ -58,10 +67,31 @@ void tbl_del(Table *const me) {
         return;
     }
     free(me->table);
+    me->table = NULL;
     me->len = 0;    /* Maybe check that len is zero before free? */
     me->cap = 0;
 
     return;
+}
+
+void tbl_debug_verbose(const Table *const me) {
+    size_t i = 0;
+
+    assert(me && "me is null");
+    printf("(len: %zu, cap: %zu) {\n", me->len, me->cap);
+    assert(me->cap == 0 && me->table == NULL || me->cap != 0 && me->table != NULL);
+
+    for (i = 0; i < me->cap; ++i) {
+        const TableItem *item = &me->table[i];
+        printf("\t%zu: [arrow: %zu, hashcode: %zu, key: %d, value: %d],\n",
+            i, item->arrow, item->hashcode, item->key, item->value);
+    }
+
+    if (me->cap == 0) {
+        printf("\tNULL\n");
+    }
+
+    printf("}\n");
 }
 
 size_t key_hash(KeyType key) {
