@@ -14,15 +14,6 @@
 #include "common.h"
 
 
-
-#define NUM2IDX(tbl, num) ((num) % (tbl.cap))
-
-
-static void _get_bounds_nocheck(Table *me, size_t home, size_t bounds[2]) {
-
-
-}
-
 /** Get the number of items belonging to 'home'.
  * 
  * If start is empty or invalid (i.e. points to nothing), then we have zero
@@ -49,7 +40,6 @@ static size_t atbl_get_count_nocheck(Table *me, size_t home) {
     return count;
 }
 
-
 size_t atbl_get_firstemptyidx_nocheck(const Table *const me, size_t home) {
     size_t i = 0;
 
@@ -63,7 +53,7 @@ size_t atbl_get_firstemptyidx_nocheck(const Table *const me, size_t home) {
     assert(0 && "impossible");
 }
 
-void atbl_moveidx_nocheck(Table *me, size_t src_idx, size_t dst_idx) {
+void atbl_moveidx_nocheck(Table *const me, size_t src_idx, size_t dst_idx) {
     TableItem *src = &me->table[src_idx];
     TableItem *dst = &me->table[dst_idx];
 
@@ -72,14 +62,20 @@ void atbl_moveidx_nocheck(Table *me, size_t src_idx, size_t dst_idx) {
     dst->value = src->value;
 }
 
-void atbl_insert_knownhashcode_nocheck(Table *me, KeyType key, size_t hashcode, size_t home, ValueType value) {
+void atbl_insert_knownhashcode_nocheck(Table *const me, KeyType key, size_t hashcode, const size_t home, ValueType value) {
+    const size_t after_home = (home + 1) % me->cap;
     size_t empty_idx = atbl_get_firstemptyidx_nocheck(me, home);
-
-    me->table[empty_idx].arrow = NOWHERE;
+    
+    if (empty_idx != home && empty_idx != after_home) {
+        if (me->table[(empty_idx - 1) % me->cap].arrow == 0) {
+            me->table[empty_idx].arrow = 1;
+        } else {
+            me->table[empty_idx].arrow = NOWHERE;
+        }
+    }
 
     for (size_t table_idx = empty_idx; table_idx != home; table_idx = (table_idx - 1) % me->cap) {
         size_t count = atbl_get_count_nocheck(me, table_idx);
-
         if (count > 0) {
             size_t start_idx = table_idx + me->table[table_idx].arrow;
             size_t end_idx = (table_idx + 1 + me->table[(table_idx + 1) % me->cap].arrow) % me->cap;
@@ -90,9 +86,12 @@ void atbl_insert_knownhashcode_nocheck(Table *me, KeyType key, size_t hashcode, 
 
             empty_idx = start_idx;
 
-            ++me->table[end_idx].arrow;
+            ++me->table[(table_idx + 1) % me->cap].arrow;
+            /* If the next square we check relies on start being the the correct
+            spot, we don't change it yet. The next square promises to change it
+            though. */
             if (atbl_get_count_nocheck(me, (table_idx - 1) % me->cap) == 0) {
-                ++me->table[(table_idx - 1) % me->cap].arrow;
+                ++me->table[table_idx].arrow;
             }
         }
     }
@@ -100,18 +99,36 @@ void atbl_insert_knownhashcode_nocheck(Table *me, KeyType key, size_t hashcode, 
     me->table[empty_idx].hashcode = hashcode;
     me->table[empty_idx].key = key;
     me->table[empty_idx].value = value;
-
-    if (me->table[home].arrow == EMPTY || me->table[home].arrow == NOWHERE) {
-        me->table[home].arrow = (empty_idx - home) % me->cap;
-    }
-    if (me->table[(home + 1) % me->cap].arrow == EMPTY) {
-        /* no operation */
-    } else if (me->table[(home + 1) % me->cap].arrow == NOWHERE) {
-        /* offset (i.e. arrow) is the same between start and end if there is
-        only one element. */
+    switch (me->table[home].arrow) {
+    case EMPTY:
+        me->table[home].arrow = 0;
+        break;
+    case NOWHERE:
+        /* Point to empty_idx */
+        me->table[home].arrow = (empty_idx + me->cap - home) % me->cap;
+        /* There is guaranteed to be exactly 1 item and the next square is
+        guaranteed to be occupied; this means the arrows for home and home+1 are
+        identical. */
         me->table[(home + 1) % me->cap].arrow = me->table[home].arrow;
-    } else {
-        ++me->table[(home + 1) % me->cap].arrow;
+        break;
+    default:
+        do {
+            const size_t home_arrow = me->table[home].arrow;
+            const size_t after_home_arrow = me->table[after_home].arrow;
+
+            if (after_home_arrow == EMPTY && home_arrow == 0) {
+                /* non-empty */
+                me->table[after_home].arrow = 1;
+            } else if (after_home_arrow == EMPTY && home_arrow == 1 || after_home_arrow == NOWHERE || after_home_arrow + 1 == home_arrow) {
+                /* empty */
+                me->table[home].arrow = (empty_idx + me->cap - home) % me->cap;
+                me->table[after_home].arrow = me->table[home].arrow; 
+            } else {
+                /* one-or-more items */
+                ++me->table[after_home].arrow; 
+            }
+        } while (0);
+        break;
     }
     ++me->len;
 }
@@ -120,18 +137,6 @@ bool atbl_insert_knownhashcode(
     Table *me, KeyType key, size_t hashcode, size_t home, ValueType value) {
     size_t count = 0;
 
-    /* Base case */
-    if (me->table[home].arrow == EMPTY) {
-        me->table[home].arrow = 0;
-        me->table[home].hashcode = hashcode;
-        me->table[home].key = key;
-        me->table[home].value = value;
-        /* me->table[home].arrow = 0 or EMPTY */
-
-        ++me->len;
-        return false;
-    }
-    
     /* If there are items belonging to 'home', check for the key. */
     count = atbl_get_count_nocheck(me, home);
     if (count > 0) {
@@ -181,7 +186,7 @@ bool atbl_insert(Table *me, KeyType key, ValueType value) {
         for (i = 0; i < old_cap; ++i) {
             const TableItem *item = &old_table[i];
             if (item->arrow != EMPTY) {
-                const size_t home = item->hashcode / me->cap;
+                const size_t home = item->hashcode % me->cap;
                 atbl_insert_knownhashcode(
                     me, item->key, item->hashcode, home, item->value);
             }
@@ -234,15 +239,23 @@ int main(void) {
     atbl_insert(&me, 80, 0);
     tbl_debug_verbose(&me);
 
-    atbl_insert(&me, 90, 0);
-    tbl_debug_verbose(&me);
-    atbl_insert(&me, 100, 0);
-    tbl_debug_verbose(&me);
-    atbl_insert(&me, 110, 0);
-    tbl_debug_verbose(&me);
-    atbl_insert(&me, 120, 0);
-    tbl_debug_verbose(&me);
+    // atbl_insert(&me, 90, 0);
+    // tbl_debug_verbose(&me);
+    // atbl_insert(&me, 100, 0);
+    // tbl_debug_verbose(&me);
+    // atbl_insert(&me, 110, 0);
+    // tbl_debug_verbose(&me);
+    // atbl_insert(&me, 120, 0);
+    // tbl_debug_verbose(&me);
 
+    atbl_insert(&me, 1, 0);
+    atbl_insert(&me, 21, 0);
+    atbl_insert(&me, 41, 0);
+    atbl_insert(&me, 61, 0);
+    atbl_insert(&me, 81, 0);
+    atbl_insert(&me, 101, 0);
+    atbl_insert(&me, 121, 0);
+    tbl_debug_verbose(&me);
 
     return 0;
 }
