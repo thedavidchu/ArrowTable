@@ -140,9 +140,10 @@ bool atbl_insert_knownhashcode(
     /* If there are items belonging to 'home', check for the key. */
     count = atbl_get_count_nocheck(me, home);
     if (count > 0) {
+        const size_t start_idx = (home + me->table[home].arrow) % me->cap;
         size_t offset = 0;
         for (offset = 0; offset < count; ++offset) {
-            const size_t table_idx = (home + offset) % me->cap;
+            const size_t table_idx = (start_idx + offset) % me->cap;
             TableItem *item_p = &me->table[table_idx];
 
             if (hashcode == item_p->hashcode && key_eq(key, item_p->key)) {
@@ -156,15 +157,6 @@ bool atbl_insert_knownhashcode(
     }
 
 insert:
-    /* pass */
-    atbl_insert_knownhashcode_nocheck(me, key, hashcode, home, value);
-
-    return false;
-}
-
-bool atbl_insert(Table *me, KeyType key, ValueType value) {
-    const size_t hashcode = key_hash(key);
-    const size_t home = hashcode % me->cap;
 
     if (me->len >= GROWTH_THRESHOLD * me->cap) {
         TableItem *old_table = me->table;
@@ -187,11 +179,21 @@ bool atbl_insert(Table *me, KeyType key, ValueType value) {
             const TableItem *item = &old_table[i];
             if (item->arrow != EMPTY) {
                 const size_t home = item->hashcode % me->cap;
-                atbl_insert_knownhashcode(
+                atbl_insert_knownhashcode_nocheck(
                     me, item->key, item->hashcode, home, item->value);
             }
         }
     }
+    /* pass */
+    atbl_insert_knownhashcode_nocheck(me, key, hashcode, home, value);
+
+    return false;
+}
+
+bool atbl_insert(Table *me, KeyType key, ValueType value) {
+    const size_t hashcode = key_hash(key);
+    const size_t home = hashcode % me->cap;
+
 
     return atbl_insert_knownhashcode(me, key, hashcode, home, value);
 }
@@ -202,11 +204,12 @@ TableItem *atbl_search(Table *me, KeyType key) {
     const size_t home = hashcode % me->cap;
     const size_t count = atbl_get_count_nocheck(me, home);
     if (count > 0) {
+        const size_t start_idx = (home + me->table[home].arrow) % me->cap;
         size_t offset = 0;
         for (offset = 0; offset < count; ++offset) {
-            const size_t table_idx = (home + offset) % me->cap;
+            const size_t table_idx = (start_idx + offset) % me->cap;
             TableItem *item_p = &me->table[table_idx];
-
+            printf("%p\n", item_p);
             if (hashcode == item_p->hashcode && key_eq(key, item_p->key)) {
                 return item_p;
             }
@@ -256,6 +259,17 @@ int main(void) {
     atbl_insert(&me, 101, 0);
     atbl_insert(&me, 121, 0);
     tbl_debug_verbose(&me);
+    atbl_insert(&me, 121, 1);
+    tbl_debug_verbose(&me);
+    atbl_insert(&me, 121, 2);
+    tbl_debug_verbose(&me);
+    atbl_insert(&me, 121, 3);
+    tbl_debug_verbose(&me);
+    atbl_insert(&me, 121, 4);
+    tbl_debug_verbose(&me);
+    
+    assert(atbl_search(&me, 121)->key == 121);
+    assert(atbl_search(&me, 122) == NULL);
 
     return 0;
 }
