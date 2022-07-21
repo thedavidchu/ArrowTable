@@ -1,4 +1,9 @@
-/** Arrow Table Implementation */
+/** Arrow Table Implementation
+ *
+ * Language: C99
+ * 
+ *
+ */
 
 #include <assert.h>
 #include <stdbool.h>
@@ -12,7 +17,9 @@
  * If start is empty or invalid (i.e. points to nothing), then we have zero
  * items belonging to the home.
  * 
- * Next, we want to check if the end is valid. If start is zero, then 
+ * Next, we want to check if the end is valid. If start is zero and end is
+ * empty, then we have 1 item. Otherwise, we return the difference between
+ * the points in the start and the end.
 */
 static size_t atbl_get_count_nocheck(Table *me, size_t home) {
     const size_t start_offset = me->table[home].arrow;
@@ -131,26 +138,13 @@ bool atbl_insert_knownhashcode(
     size_t count = 0;
 
     /* If there are items belonging to 'home', check for the key. */
-    count = atbl_get_count_nocheck(me, home);
-    if (count > 0) {
-        const size_t start_idx = (home + me->table[home].arrow) % me->cap;
-        size_t offset = 0;
-        for (offset = 0; offset < count; ++offset) {
-            const size_t table_idx = (start_idx + offset) % me->cap;
-            TableItem *item_p = &me->table[table_idx];
-
-            if (hashcode == item_p->hashcode && key_eq(key, item_p->key)) {
-                item_p->value = value;
-                return true;
-            }
-        }
-
-        /* key not found */
-        goto insert;
+    TableItem *item_p = atbl_search_knownhashcode_nocheck(me, key, hashcode, home);
+    if (item_p != NULL) {
+        item_p->value = value;
+        return true;
     }
 
 insert:
-
     if (me->len >= GROWTH_THRESHOLD * me->cap) {
         TableItem *old_table = me->table;
         const size_t old_cap = me->cap;
@@ -179,7 +173,6 @@ insert:
     }
     /* pass */
     atbl_insert_knownhashcode_nocheck(me, key, hashcode, home, value);
-
     return false;
 }
 
@@ -187,15 +180,13 @@ bool atbl_insert(Table *me, KeyType key, ValueType value) {
     const size_t hashcode = key_hash(key);
     const size_t home = hashcode % me->cap;
 
-
     return atbl_insert_knownhashcode(me, key, hashcode, home, value);
 }
 
 
-TableItem *atbl_search(Table *me, KeyType key) {
-    const size_t hashcode = key_hash(key);
-    const size_t home = hashcode % me->cap;
+TableItem *atbl_search_knownhashcode_nocheck(const Table *const me, const KeyType key, const size_t hashcode, const size_t home) {
     const size_t count = atbl_get_count_nocheck(me, home);
+    
     if (count > 0) {
         const size_t start_idx = (home + me->table[home].arrow) % me->cap;
         size_t offset = 0;
@@ -207,11 +198,18 @@ TableItem *atbl_search(Table *me, KeyType key) {
                 return item_p;
             }
         }
-
         goto not_found;
     }
 not_found:
     return NULL;
+}
+
+
+TableItem *atbl_search(const Table *const me, const KeyType key) {
+    const size_t home = hashcode % me->cap;
+    const size_t hashcode = key_hash(key);
+    
+    return atbl_search_knownhashcode_nocheck(me, key, hashcode, home);
 }
 
 
