@@ -83,8 +83,19 @@ void tbl_debug_verbose(const Table *const me) {
 
     for (i = 0; i < me->cap; ++i) {
         const TableItem *item = &me->table[i];
-        printf("\t%zu: [arrow: %zu, hashcode: %zu, key: %d, value: %d],\n",
-            i, item->arrow, item->hashcode, item->key, item->value);
+        if (item->arrow == EMPTY) {
+            printf("\t%zu: [arrow: EMPTY, hashcode: (%zu), key: (%d), value: (%d)],\n",
+                i, item->hashcode, item->key, item->value);
+        } else {
+            printf("\t%zu: [arrow: ", i);
+            if (item->arrow == NOWHERE) {
+                printf("NOWHERE");
+            } else {
+                printf("%zu", item->arrow);
+            }
+            printf(", hashcode: %zu, key: %d, value: %d],\n",
+                item->hashcode, item->key, item->value);
+        }
     }
 
     if (me->cap == 0) {
