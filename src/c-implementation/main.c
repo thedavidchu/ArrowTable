@@ -1,11 +1,4 @@
-/** Arrow Table Implementation
- * 
- * Coding Style
- * ------------
- * 
- * You may notice that I am trying to conform closely to the C programming
- * language. This is because would prefer to write this in pure C, but I did not
- * want to implement my own "vector". */
+/** Arrow Table Implementation */
 
 #include <assert.h>
 #include <stdbool.h>
