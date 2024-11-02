@@ -29,7 +29,35 @@ static bool
 is_ok(struct ArrowTable const *const me)
 {
     // Short-circuit is OK! We won't dereference a NULL pointer.
-    return me != NULL && me->data != NULL && me->capacity != 0;
+    return me != NULL && me->data != NULL && me->capacity > 0;
+}
+
+/// @brief  Count the hash collisions (i.e. how big the bucket's array is).
+static size_t
+count_collisions(struct ArrowTable const *const me, size_t const idx)
+{
+    size_t next_idx = 0;
+    int my_arrow = 0, next_arrow = 0;
+    size_t cnt = 0;
+
+    assert(is_ok(me) && idx < me->capacity);
+
+    next_idx = (idx + 1) % me->capacity;
+    my_arrow = me->data[idx].arrow;
+    next_arrow = me->data[next_idx].arrow;
+
+    if (my_arrow < 0 || next_arrow == -2) {
+        assert(my_arrow == -1 || my_arrow == -2);
+        // TODO We can do a bunch of assertions to make sure everything is as expected.
+        return 0;
+    }
+    if (my_arrow == 0 && next_arrow == -1) {
+        return 1;
+    }
+
+    cnt = 1 + next_arrow - my_arrow;
+    assert(cnt > 0);
+    return cnt;
 }
 
 static struct Bounds
@@ -56,6 +84,14 @@ get_bounds(struct ArrowTable const *const me, size_t const idx)
     return (struct Bounds){(idx + my_arrow) % me->capacity, (next_idx + next_arrow) % me->capacity};
 }
 
+/// @brief  Return whether there is a valid key/value pair residing in the cell.
+static bool
+cell_filled(struct ArrowTable const *const me, size_t const idx)
+{
+    assert(is_ok(me) && idx < me->capacity);
+    return me->data[idx].key != -1;
+}
+
 /// @note   Arbitrarily set the threshold to grow at 90% full.
 static bool
 is_full_enough_to_grow(struct ArrowTable const *const me)
@@ -69,30 +105,77 @@ is_full_enough_to_grow(struct ArrowTable const *const me)
 static int
 insert_with_enough_room(struct ArrowTable *const me, int const key, int const value)
 {
-    size_t h = 0, idx = 0;
+    size_t h = 0, idx = 0, next_idx = 0;
     // NOTE I assume no integer overflow in the length!
     assert(is_ok(me) && me->length + 1 < me->capacity);
+    assert(key >= 0 && value >= 0);
 
     h = hash(key);
     idx = h % me->capacity;
+    next_idx = (idx + 1) % me->capacity;
+
 
     struct Bounds bounds = get_bounds(me, idx);
     
-    if (1) {
-        me->data[idx] = (struct ArrowCell){.key = key, .value = value, .arrow = 0};
-        ++me->length;
-        return 0;
-    }
-    
+    // Cases:
+    // 1. Spot empty, invalid arrows: simple insert.
+    // 2. Spot empty, valid arrows: IMPOSSIBLE!
+    // 3. Spot filled, invalid arrows: search for next free spot.
+    // 4. Spot filled, valid arrows: insert at tail, evict victim.
+    size_t victim_idx = 0;
     int victim_key = 0;
     int victim_value = 0;
-    return insert_with_enough_room(me, victim_key, victim_value);
+    if (!cell_filled(me, idx)) { // Case 1.
+        me->data[idx] = (struct ArrowCell){.key = key, .value = value, .arrow = 0};
+        me->data[next_idx].arrow = cell_filled(me, next_idx) ? 0 : -1;
+        ++me->length;
+        return 0;
+    } else if (bounds.start_idx == bounds.stop_idx) { // Case 3.
+        // NOTE We already know that the cell at idx is filled.
+        for (size_t i = idx + 1; i != idx; i = (i + 1) % me->capacity) {
+            struct Bounds b = get_bounds(me, i);
+            if (!cell_filled(me, i)) {
+                // TODO Simply fill this spot and adjust the arrows
+                size_t diff = (i + me->capacity - idx) % me->capacity;
+                me->data[i] = (struct ArrowCell){.key = key, .value = value, .arrow = 0};
+                me->data[idx].arrow = diff;
+                me->data[next_idx].arrow = diff;
+                ++me->length;
+                return 0;
+            } else if (b.start_idx != b.stop_idx) {
+                // TODO Fill the start_idx spot and adjust the arrows. Recurse on victim.
+                size_t diff = (i + me->capacity - idx) % me->capacity;
+                victim_key = me->data[b.start_idx].key;
+                victim_value = me->data[b.start_idx].value;
+                me->data[b.start_idx].key = key;
+                me->data[b.start_idx].value = value;
+                ++me->data[i].arrow;
+                me->data[idx].arrow = diff;
+                me->data[next_idx].arrow = diff;
+                return insert_with_enough_room(me, victim_key, victim_value);
+            }
+        }
+        assert(0 && "IMPOSSIBLE!");
+    } else { // Case 4.
+        victim_key = me->data[bounds.stop_idx].key;
+        victim_value = me->data[bounds.stop_idx].value;
+        me->data[bounds.stop_idx].key = key;
+        me->data[bounds.stop_idx].value = value;
+        ++me->data[next_idx].arrow;
+        if (victim_key == -1) {
+            ++me->length;
+            return 0;
+        }
+        // TODO Increment the arrow for the thing we just incremented.
+        return insert_with_enough_room(me, victim_key, victim_value);
+    }
+    
 }
 
 /// @brief  Double the size of the hash table.
 /// @note   We don't support shrinking the hash table. Too bad, so sad!
 static int
-grow_hash_table(struct ArrowTable const *const me)
+grow_hash_table(struct ArrowTable *const me)
 {
     struct ArrowTable old_table = {0};
     struct ArrowTable new_table = {0};
@@ -114,7 +197,8 @@ grow_hash_table(struct ArrowTable const *const me)
         new_table.data[i].arrow = -2;
     }
 
-    // Fill new data
+    // Fill new table with existing data
+    // NOTE I could also simply fill this with all the valid key/value pairs.
     for (size_t i = 0; i < old_table.capacity; ++i) {
         struct Bounds bounds = get_bounds(&old_table, i);
         if (bounds.start_idx == bounds.stop_idx) continue;
@@ -122,6 +206,9 @@ grow_hash_table(struct ArrowTable const *const me)
             insert_with_enough_room(&new_table, old_table.data[i].key, old_table.data[i].value);
         }
     }
+    // Cleanup temporary structures
+    ArrowTable_destroy(&old_table);
+    *me = new_table;
     return 0;
 }
 
@@ -160,6 +247,18 @@ ArrowTable_destroy(struct ArrowTable *const me)
     free(me->data);
     *me = (struct ArrowTable){0};
     return 0;
+}
+
+void
+ArrowTable_print(struct ArrowTable const *const me, FILE *const stream, bool const newline)
+{
+    if (!me || stream == NULL) return;
+    fprintf(stream, "ArrowTable(.data={\n");
+    for (size_t i = 0; i < me->capacity; ++i) {
+        fprintf(stream, "\t%zu: {.key=%d,.value=%d,.arrow=%d},\n", i, me->data[i].key, me->data[i].value, me->data[i].arrow);
+    }
+    fprintf(stream, "}, .length = %zu, .capacity = %zu)", me->length, me->capacity);
+    if (newline) fprintf(stream, "\n");
 }
 
 int

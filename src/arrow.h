@@ -30,17 +30,8 @@ ArrowTable_init(struct ArrowTable *const me);
 int
 ArrowTable_destroy(struct ArrowTable *const me);
 
-static inline void
-ArrowTable_print(struct ArrowTable const *const me, FILE *const stream, bool const newline)
-{
-    if (!me || stream == NULL) return;
-    fprintf(stream, "ArrowTable(.data=[");
-    for (size_t i = 0; i < me->capacity; ++i) {
-        fprintf(stream, "{.key=%d,.value=%d,.arrow=%d}, ", me->data[i].key, me->data[i].value, me->data[i].arrow);
-    }
-    fprintf(stream, "], .length = %zu, .capacity = %zu)", me->length, me->capacity);
-    if (newline) fprintf(stream, "\n");
-}
+void
+ArrowTable_print(struct ArrowTable const *const me, FILE *const stream, bool const newline);
 
 /// @brief  Get a value from the ArrowTable.
 /// @return Returns the value or -1 on failure.
