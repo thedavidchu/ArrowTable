@@ -7,3 +7,6 @@ build:
 test: build
 	./a.out
 
+clean:
+	rm -rf a.out trace.txt
+
