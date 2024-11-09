@@ -153,6 +153,7 @@ insert_with_enough_room(struct ArrowTable *const me, int const key, int const va
     int victim_key = 0, victim_value = 0;
     // NOTE I assume no integer overflow in the length!
     assert(is_ok(me) && me->length + 1 < me->capacity);
+    if (value < 0) return 0;
     assert(key >= 0 && value >= 0);
 
     h = hash(key);
@@ -373,6 +374,23 @@ ArrowTable_put(struct ArrowTable *const me, int const key, int const value)
 int
 ArrowTable_remove(struct ArrowTable *const me, int const key)
 {
+
+    int err = 0;
+    size_t idx = 0;
+    if (!is_ok(me) || key < 0) {
+        return -1;
+    }
+
+    idx = get_index(me, key);
+    // NOTE I'm not sure what the semantics should be if we try to
+    //      delete a key/value pair that does not exist.
+    if (idx == SIZE_MAX)
+        return 0;
+    assert(idx < me->capacity);
+    me->data[idx].value = -1;
+    // size_t home = 0;
+    // home = hash(key) % me->capacity;
+
     return 0;
 }
 
