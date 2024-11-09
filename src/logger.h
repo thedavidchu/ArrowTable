@@ -29,7 +29,7 @@
 //      means there is no performance overhead for unused logging (assuming
 //      effective dead code elimination).
 #define LOGGER_STREAM stdout
-#define LOGGER_LEVEL  LOGGER_LEVEL_NONE
+#define LOGGER_LEVEL  LOGGER_LEVEL_INFO
 
 // NOTE The relationship between these levels is subject to change. But
 //      if you do go ahead and change them, you need to change the
