@@ -220,7 +220,7 @@ grow_hash_table(struct ArrowTable *const me)
 
     old_table = *me;
     new_table = (struct ArrowTable){
-        .data = calloc(old_table.capacity, sizeof(*new_table.data)),
+        .data = calloc(2 * old_table.capacity, sizeof(*new_table.data)),
         .capacity = 2 * old_table.capacity,
         .length = 0,
     };
