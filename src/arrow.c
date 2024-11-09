@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdlib.h>
 
 #include "arrow.h"
@@ -113,6 +114,26 @@ get_bounds(struct ArrowTable const *const me, size_t const idx)
     return (struct Bounds){(idx + my_arrow) % me->capacity, (next_idx + next_arrow) % me->capacity};
 }
 
+/// @brief  Get the index of a key/value pair or return SIZE_MAX if it's not present.
+static size_t
+get_index(struct ArrowTable const *const me, int const key)
+{
+    struct Bounds bounds = {0};
+    assert(is_ok(me) && key >= 0);
+
+    bounds = get_bounds(me, hash(key) % me->capacity);
+    if (bounds.start_idx == bounds.stop_idx) {
+        return SIZE_MAX;
+    }
+    for (size_t idx = bounds.start_idx; idx != bounds.stop_idx; idx = (idx + 1) % me->capacity) {
+        if (me->data[idx].key == key) {
+            return idx;
+        }
+    }
+    return SIZE_MAX;
+
+}
+
 /// @note   Arbitrarily set the threshold to grow at 90% full.
 static bool
 is_full_enough_to_grow(struct ArrowTable const *const me)
@@ -212,22 +233,16 @@ insert_with_enough_room(struct ArrowTable *const me, int const key, int const va
 static int
 update_or_insert_with_enough_room(struct ArrowTable *const me, int const key, int const value)
 {
-    size_t h = 0, idx = 0;
+    size_t idx = 0;
     // NOTE I assume no integer overflow in the length!
     assert(is_ok(me) && me->length + 1 < me->capacity);
     assert(key >= 0 && value >= 0);
 
-    h = hash(key);
-    idx = h % me->capacity;
-    if (count_collisions(me, idx) != 0) {
-        struct Bounds b = get_bounds(me, idx);
-        LOGGER_TRACE("Update: idx=%zu, start_idx=%zu, stop_idx=%zu", idx, b.start_idx, b.stop_idx);
-        for (size_t i = b.start_idx; i != b.stop_idx; i = (i + 1) % me->capacity) {
-            if (me->data[i].key == key) {
-                me->data[i].value = value;
-                return 0;
-            }
-        }
+    idx = get_index(me, key);
+    if (idx != SIZE_MAX) {
+        assert(idx < me->capacity);
+        me->data[idx].value = value;
+        return 0;
     }
     return insert_with_enough_room(me, key, value);
 }
@@ -324,25 +339,20 @@ ArrowTable_print(struct ArrowTable const *const me, FILE *const stream, bool con
 int
 ArrowTable_get(struct ArrowTable const *const me, int const key)
 {
-    size_t h = 0;
-    struct Bounds bounds = {0};
+    size_t idx = 0;
+    int value = 0;
 
     if (!is_ok(me) || key < 0) {
         return -1;
     }
 
-    h = hash(key);
-    bounds = get_bounds(me, h % me->capacity);
-    if (bounds.start_idx == bounds.stop_idx) {
-        // Key not found! This shouldn't be an error in the same sense as above...
+    idx = get_index(me, key);
+    if (idx == SIZE_MAX)
         return -1;
-    }
-    for (size_t idx = bounds.start_idx; idx != bounds.stop_idx; idx = (idx + 1) % me->capacity) {
-        if (me->data[idx].key == key) {
-            return me->data[idx].value;
-        }
-    }
-    return -1;
+    assert(idx < me->capacity);
+    value = me->data[idx].value;
+    assert(value >= 0);
+    return value;
 }
 
 int
