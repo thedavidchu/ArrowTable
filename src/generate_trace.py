@@ -34,7 +34,7 @@ def write_trace(trace: list[tuple[str, int, int]], path: Path):
 
 
 def main():
-    trace = generate_trace(0, 3, 10)
+    trace = generate_trace(0, 100, 1000)
     write_trace(trace, "trace.txt")
 
 
