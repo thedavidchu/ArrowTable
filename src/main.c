@@ -30,21 +30,20 @@ main(void)
     printf("GET %d = %d\n", 3, ArrowTable_get(&a, 3)); 
 
     printf("PUT %d %d = %d\n", 0, 0, ArrowTable_put(&a, 0, 0));
-    ArrowTable_print(&a, stdout, true);
-    printf("---\n");
     printf("PUT %d %d = %d\n", 1, 0, ArrowTable_put(&a, 1, 0));
-    ArrowTable_print(&a, stdout, true);
-    printf("---\n");
     printf("PUT %d %d = %d\n", 2, 0, ArrowTable_put(&a, 2, 0));
-    ArrowTable_print(&a, stdout, true);
-    printf("---\n");
     printf("PUT %d %d = %d\n", 3, 0, ArrowTable_put(&a, 3, 0));
-    ArrowTable_print(&a, stdout, true);
-    printf("---\n");
     printf("PUT %d %d = %d\n", 8, 0, ArrowTable_put(&a, 8, 0));
+    printf("PUT %d %d = %d\n", 16, 0, ArrowTable_put(&a, 16, 0));
     ArrowTable_print(&a, stdout, true);
     printf("---\n");
-    printf("PUT %d %d = %d\n", 16, 0, ArrowTable_put(&a, 16, 0));
+
+    printf("PUT %d %d = %d\n", 0, 1, ArrowTable_put(&a, 0, 1));
+    printf("PUT %d %d = %d\n", 1, 1, ArrowTable_put(&a, 1, 1));
+    printf("PUT %d %d = %d\n", 2, 1, ArrowTable_put(&a, 2, 1));
+    printf("PUT %d %d = %d\n", 3, 1, ArrowTable_put(&a, 3, 1));
+    printf("PUT %d %d = %d\n", 8, 1, ArrowTable_put(&a, 8, 1));
+    printf("PUT %d %d = %d\n", 16, 1, ArrowTable_put(&a, 16, 1));
     ArrowTable_print(&a, stdout, true);
     printf("---\n");
     

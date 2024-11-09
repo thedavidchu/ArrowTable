@@ -208,6 +208,30 @@ insert_with_enough_room(struct ArrowTable *const me, int const key, int const va
     }
 }
 
+/// @brief  Update an existing key or insert a key/value pair.
+static int
+update_or_insert_with_enough_room(struct ArrowTable *const me, int const key, int const value)
+{
+    size_t h = 0, idx = 0;
+    // NOTE I assume no integer overflow in the length!
+    assert(is_ok(me) && me->length + 1 < me->capacity);
+    assert(key >= 0 && value >= 0);
+
+    h = hash(key);
+    idx = h % me->capacity;
+    if (count_collisions(me, idx) != 0) {
+        struct Bounds b = get_bounds(me, idx);
+        LOGGER_TRACE("Update: idx=%zu, start_idx=%zu, stop_idx=%zu", idx, b.start_idx, b.stop_idx);
+        for (size_t i = b.start_idx; i != b.stop_idx; i = (i + 1) % me->capacity) {
+            if (me->data[i].key == key) {
+                me->data[i].value = value;
+                return 0;
+            }
+        }
+    }
+    return insert_with_enough_room(me, key, value);
+}
+
 /// @brief  Double the size of the hash table.
 /// @note   We don't support shrinking the hash table. Too bad, so sad!
 static int
@@ -230,6 +254,7 @@ grow_hash_table(struct ArrowTable *const me)
     }
     for (size_t i = 0; i < new_table.capacity; ++i) {
         new_table.data[i].key = -1;
+        new_table.data[i].value = -1;
         new_table.data[i].arrow = -1;
     }
 
@@ -265,6 +290,7 @@ ArrowTable_init(struct ArrowTable *const me)
     // Set all of the cells to the INVALID state.
     for (size_t i = 0; i < DEFAULT_INIT_SIZE; ++i) {
         me->data[i].key = -1;
+        me->data[i].value = -1;
         me->data[i].arrow = -1;
     }
     me->length = 0;
@@ -331,7 +357,7 @@ ArrowTable_put(struct ArrowTable *const me, int const key, int const value)
             return err;
         }
     }
-    return insert_with_enough_room(me, key, value);
+    return update_or_insert_with_enough_room(me, key, value);
 }
 
 int
