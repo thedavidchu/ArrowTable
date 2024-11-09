@@ -61,7 +61,7 @@ static int
 run_trace(char const *const trace_path)
 {
     char op_str[4] = {0};
-    int key = 0, value = 0;
+    int key = 0, value = 0, answer = 0;
     int err = 0;
     struct ArrowTable a = {0};
 
@@ -85,9 +85,23 @@ run_trace(char const *const trace_path)
             break;
         LOGGER_TRACE("%s, %d, %d", op_str, key, value);
         if (strcmp(op_str, "GET") == 0) {
-            assert(ArrowTable_get(&a, key) == value);
+            answer = ArrowTable_get(&a, key);
+            if (answer != value) {
+                LOGGER_ERROR("GET %d returns %d, expected %d", key, answer, value);
+                return -1;
+            }
         } else if (strcmp(op_str, "PUT") == 0) {
-            assert(ArrowTable_put(&a, key, value) == 0);
+            answer = ArrowTable_put(&a, key, value);
+            if (answer != 0) {
+                LOGGER_ERROR("PUT %d %d returns %d, expected 0", key, value, answer);
+                return -1;
+            }
+        } else if (strcmp(op_str, "DEL") == 0) {
+            answer = ArrowTable_remove(&a, key);
+            if (answer != 0) {
+                LOGGER_ERROR("DEL %d returns %d, expected 0", key, answer);
+                return -1;
+            }
         } else {
             assert(0 && "IMPOSSIBLE!");
         }
