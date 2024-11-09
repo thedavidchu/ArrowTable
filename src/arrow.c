@@ -93,6 +93,8 @@ count_collisions(struct ArrowTable const *const me, size_t const idx)
     return cnt;
 }
 
+/// @brief  Get the (would-be) start and stop index for a range.
+///         This is guaranteed to be correct even when the arrows are valid but the cell is not.
 static struct Bounds
 get_bounds(struct ArrowTable const *const me, size_t const idx)
 {
@@ -187,7 +189,9 @@ insert_with_enough_room(struct ArrowTable *const me, int const key, int const va
         assert(0 && "IMPOSSIBLE!");
     } else if (cell_filled(me, idx) && valid_arrows(me, idx)) {
         LOGGER_TRACE("Case 4: key=%d, value=%d", key, value);
-        victim_idx = get_bounds(me, idx).stop_idx;
+        LOGGER_TRACE("Case 4 (cont'd): idx=%zu", idx);
+        victim_idx = (me->data[next_idx].arrow + next_idx) % me->capacity;
+        LOGGER_TRACE("Case 4 (cont'd): victim_idx=%zu", victim_idx);
         victim_key = me->data[victim_idx].key;
         victim_value = me->data[victim_idx].value;
         me->data[victim_idx].key = key;

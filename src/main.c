@@ -44,6 +44,9 @@ main(void)
     printf("PUT %d %d = %d\n", 8, 0, ArrowTable_put(&a, 8, 0));
     ArrowTable_print(&a, stdout, true);
     printf("---\n");
+    printf("PUT %d %d = %d\n", 16, 0, ArrowTable_put(&a, 16, 0));
+    ArrowTable_print(&a, stdout, true);
+    printf("---\n");
     
     if ((err = ArrowTable_destroy(&a))) {
         print_error(err);
