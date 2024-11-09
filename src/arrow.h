@@ -11,7 +11,7 @@ struct ArrowCell {
     int key;
     // A value of -1 would signal an error in the 'get' function.
     int value;
-    // An arrow of -2 signals INVALID, -1 means the previous is valid but current is invalid.
+    // An arrow of -1 signals INVALID
     int arrow;
 };
 

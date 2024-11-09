@@ -6,6 +6,9 @@
 #include <stdlib.h>
 
 #include "arrow.h"
+#include "logger.h"
+
+static size_t const DEFAULT_INIT_SIZE = 8;
 
 /// @brief  The bounds of some index.
 ///
@@ -32,6 +35,42 @@ is_ok(struct ArrowTable const *const me)
     return me != NULL && me->data != NULL && me->capacity > 0;
 }
 
+/// @brief  Return whether there is a valid key/value pair residing in the cell.
+static bool
+cell_filled(struct ArrowTable const *const me, size_t const idx)
+{
+    assert(is_ok(me) && idx < me->capacity);
+    return me->data[idx].key != -1;
+}
+
+/// @brief  Return whether there are valid arrows in the cell idx and idx+1.
+/// @note   This says nothing about whether any valid elements hash%capacity to idx.
+///         This is because we can have the following example:
+///
+///         ---------------------------------------
+///         | CELL 0 | CELL 1  | CELL 2 | CELL 3  |
+///         ---------------------------------------
+///         | key: 0 | key: -1 | key: 2 | key: -1 |     * key = "key"
+///         | val: 0 | val: -1 | val: 2 | val: -1 |     * val = "value"
+///         | -->: 0 | -->: 0  | -->: 0 | -->: 0  |     * --> = "arrow"
+///         ---------------------------------------
+///
+///         where we can see that cells 1 and 3 are invalid but their
+///         arrows appear to be valid.
+static bool
+valid_arrows(struct ArrowTable const *const me, size_t const idx)
+{
+    size_t next_idx = 0;
+    int my_arrow = 0, next_arrow = 0;
+
+    assert(is_ok(me) && idx < me->capacity);
+
+    next_idx = (idx + 1) % me->capacity;
+    my_arrow = me->data[idx].arrow;
+    next_arrow = me->data[next_idx].arrow;
+    return my_arrow != -1 && next_arrow != -1;
+}
+
 /// @brief  Count the hash collisions (i.e. how big the bucket's array is).
 static size_t
 count_collisions(struct ArrowTable const *const me, size_t const idx)
@@ -42,21 +81,15 @@ count_collisions(struct ArrowTable const *const me, size_t const idx)
 
     assert(is_ok(me) && idx < me->capacity);
 
-    next_idx = (idx + 1) % me->capacity;
-    my_arrow = me->data[idx].arrow;
-    next_arrow = me->data[next_idx].arrow;
-
-    if (my_arrow < 0 || next_arrow == -2) {
-        assert(my_arrow == -1 || my_arrow == -2);
+    if (!cell_filled(me, idx) || !valid_arrows(me, idx)) {
         // TODO We can do a bunch of assertions to make sure everything is as expected.
         return 0;
     }
-    if (my_arrow == 0 && next_arrow == -1) {
-        return 1;
-    }
-
+    next_idx = (idx + 1) % me->capacity;
+    my_arrow = me->data[idx].arrow;
+    next_arrow = me->data[next_idx].arrow;
     cnt = 1 + next_arrow - my_arrow;
-    assert(cnt > 0);
+    assert(cnt >= 0);
     return cnt;
 }
 
@@ -66,30 +99,16 @@ get_bounds(struct ArrowTable const *const me, size_t const idx)
     size_t next_idx = 0;
     int my_arrow = 0, next_arrow = 0;
 
-    assert(me != NULL && me->data != NULL && me->capacity > 0);
-    assert(idx < me->capacity);
+    assert(is_ok(me) && idx < me->capacity);
 
-    next_idx = (idx + 1) % me->capacity;
-    my_arrow = me->data[idx].arrow;
-    next_arrow = me->data[next_idx].arrow;
-
-    if (my_arrow < 0 || next_arrow == -2) {
-        assert(my_arrow == -1 || my_arrow == -2);
+    if (count_collisions(me, idx) == 0) {
         // TODO We can do a bunch of assertions to make sure everything is as expected.
         return (struct Bounds){0, 0};
     }
-    if (my_arrow == 0 && next_arrow == -1) {
-        return (struct Bounds){idx, next_idx};
-    }
+    next_idx = (idx + 1) % me->capacity;
+    my_arrow = me->data[idx].arrow;
+    next_arrow = me->data[next_idx].arrow;
     return (struct Bounds){(idx + my_arrow) % me->capacity, (next_idx + next_arrow) % me->capacity};
-}
-
-/// @brief  Return whether there is a valid key/value pair residing in the cell.
-static bool
-cell_filled(struct ArrowTable const *const me, size_t const idx)
-{
-    assert(is_ok(me) && idx < me->capacity);
-    return me->data[idx].key != -1;
 }
 
 /// @note   Arbitrarily set the threshold to grow at 90% full.
@@ -105,7 +124,10 @@ is_full_enough_to_grow(struct ArrowTable const *const me)
 static int
 insert_with_enough_room(struct ArrowTable *const me, int const key, int const value)
 {
-    size_t h = 0, idx = 0, next_idx = 0;
+    // The 'victim' is the one who is kicked out of their current spot,
+    // i.e. the 'rich' in Robin Hood lingo.
+    size_t h = 0, idx = 0, next_idx = 0, victim_idx = 0;
+    int victim_key = 0, victim_value = 0;
     // NOTE I assume no integer overflow in the length!
     assert(is_ok(me) && me->length + 1 < me->capacity);
     assert(key >= 0 && value >= 0);
@@ -114,26 +136,28 @@ insert_with_enough_room(struct ArrowTable *const me, int const key, int const va
     idx = h % me->capacity;
     next_idx = (idx + 1) % me->capacity;
 
-
-    struct Bounds bounds = get_bounds(me, idx);
-    
     // Cases:
-    // 1. Spot empty, invalid arrows: simple insert.
-    // 2. Spot empty, valid arrows: IMPOSSIBLE!
+    // 1. Spot empty, invalid arrows: simple insert and update arrows.
+    // 2. Spot empty, valid arrows: insert without moving arrows.
     // 3. Spot filled, invalid arrows: search for next free spot.
     // 4. Spot filled, valid arrows: insert at tail, evict victim.
-    size_t victim_idx = 0;
-    int victim_key = 0;
-    int victim_value = 0;
-    if (!cell_filled(me, idx)) { // Case 1.
+    if (!cell_filled(me, idx) && !valid_arrows(me, idx)) {
+        LOGGER_TRACE("Case 1: key=%d, value=%d", key, value);
         me->data[idx] = (struct ArrowCell){.key = key, .value = value, .arrow = 0};
-        me->data[next_idx].arrow = cell_filled(me, next_idx) ? 0 : -1;
+        me->data[next_idx].arrow = 0;
         ++me->length;
         return 0;
-    } else if (bounds.start_idx == bounds.stop_idx) { // Case 3.
+    } else if (!cell_filled(me, idx) && valid_arrows(me, idx)) {
+        LOGGER_TRACE("Case 2: key=%d, value=%d", key, value);
+        assert(me->data[idx].arrow == 0 && me->data[next_idx].arrow == 0);
+        me->data[idx].key = key;
+        me->data[idx].value = value;
+        ++me->length;
+        return 0;
+    } else if (cell_filled(me, idx) && !valid_arrows(me, idx)) {
+        LOGGER_TRACE("Case 3: key=%d, value=%d", key, value);
         // NOTE We already know that the cell at idx is filled.
         for (size_t i = idx + 1; i != idx; i = (i + 1) % me->capacity) {
-            struct Bounds b = get_bounds(me, i);
             if (!cell_filled(me, i)) {
                 // TODO Simply fill this spot and adjust the arrows
                 size_t diff = (i + me->capacity - idx) % me->capacity;
@@ -142,34 +166,42 @@ insert_with_enough_room(struct ArrowTable *const me, int const key, int const va
                 me->data[next_idx].arrow = diff;
                 ++me->length;
                 return 0;
-            } else if (b.start_idx != b.stop_idx) {
+            } else if (count_collisions(me, i) != 0) {
+                struct Bounds b = get_bounds(me, i);
                 // TODO Fill the start_idx spot and adjust the arrows. Recurse on victim.
                 size_t diff = (i + me->capacity - idx) % me->capacity;
-                victim_key = me->data[b.start_idx].key;
-                victim_value = me->data[b.start_idx].value;
-                me->data[b.start_idx].key = key;
-                me->data[b.start_idx].value = value;
+                victim_idx = b.start_idx;
+                victim_key = me->data[victim_idx].key;
+                victim_value = me->data[victim_idx].value;
+                me->data[victim_idx].key = key;
+                me->data[victim_idx].value = value;
                 ++me->data[i].arrow;
                 me->data[idx].arrow = diff;
                 me->data[next_idx].arrow = diff;
+                if (victim_key == -1)
+                    return 0;
+                LOGGER_TRACE("Case 3 (cont'd): victim_key=%d, victim_value=%d", victim_key, victim_value);
                 return insert_with_enough_room(me, victim_key, victim_value);
             }
         }
         assert(0 && "IMPOSSIBLE!");
-    } else { // Case 4.
-        victim_key = me->data[bounds.stop_idx].key;
-        victim_value = me->data[bounds.stop_idx].value;
-        me->data[bounds.stop_idx].key = key;
-        me->data[bounds.stop_idx].value = value;
+    } else if (cell_filled(me, idx) && valid_arrows(me, idx)) {
+        LOGGER_TRACE("Case 4: key=%d, value=%d", key, value);
+        victim_idx = get_bounds(me, idx).stop_idx;
+        victim_key = me->data[victim_idx].key;
+        victim_value = me->data[victim_idx].value;
+        me->data[victim_idx].key = key;
+        me->data[victim_idx].value = value;
         ++me->data[next_idx].arrow;
         if (victim_key == -1) {
             ++me->length;
             return 0;
         }
-        // TODO Increment the arrow for the thing we just incremented.
+        LOGGER_TRACE("Case 4 (cont'd): victim_key=%d, victim_value=%d", victim_key, victim_value);
         return insert_with_enough_room(me, victim_key, victim_value);
+    } else {
+        assert(0 && "IMPOSSIBLE!");
     }
-    
 }
 
 /// @brief  Double the size of the hash table.
@@ -194,15 +226,13 @@ grow_hash_table(struct ArrowTable *const me)
     }
     for (size_t i = 0; i < new_table.capacity; ++i) {
         new_table.data[i].key = -1;
-        new_table.data[i].arrow = -2;
+        new_table.data[i].arrow = -1;
     }
 
     // Fill new table with existing data
     // NOTE I could also simply fill this with all the valid key/value pairs.
     for (size_t i = 0; i < old_table.capacity; ++i) {
-        struct Bounds bounds = get_bounds(&old_table, i);
-        if (bounds.start_idx == bounds.stop_idx) continue;
-        for (size_t j = bounds.start_idx; j != bounds.stop_idx; j = (j + 1) % old_table.capacity) {
+        if (cell_filled(me, i)) {
             insert_with_enough_room(&new_table, old_table.data[i].key, old_table.data[i].value);
         }
     }
@@ -229,9 +259,9 @@ ArrowTable_init(struct ArrowTable *const me)
         return errno;
     }
     // Set all of the cells to the INVALID state.
-    for (size_t i = 0; i < 8; ++i) {
+    for (size_t i = 0; i < DEFAULT_INIT_SIZE; ++i) {
         me->data[i].key = -1;
-        me->data[i].arrow = -2;
+        me->data[i].arrow = -1;
     }
     me->length = 0;
     me->capacity = 8;
