@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -14,13 +15,13 @@ print_error(int const errno_)
 }
 
 int
-main(void)
+run_simple_trace()
 {
     int err = 0;
     struct ArrowTable a = {0};
     if ((err = ArrowTable_init(&a))) {
         print_error(err);
-        return EXIT_FAILURE;
+        return err;
     }
 
     ArrowTable_print(&a, stdout, true);
@@ -49,9 +50,56 @@ main(void)
     
     if ((err = ArrowTable_destroy(&a))) {
         print_error(err);
+        return err;
+    }
+    print_error(err);
+    return 0;
+}
+
+int
+run_trace()
+{
+    char op_str[4];
+    int key = 0, value = 0;
+    int err = 0;
+    struct ArrowTable a = {0};
+
+    if ((err = ArrowTable_init(&a))) {
+        print_error(err);
+        return err;
+    }
+
+    FILE *fp = fopen("trace.txt", "r");
+    if (fp == NULL) {
+        print_error(errno);
+        // TODO Reset errno?
+        return errno;
+    }
+
+    while (1) {
+        if (fscanf(fp, "%3s %d %d", op_str, &key, &value) != 3)
+            break;
+        printf("%s, %d, %d\n", op_str, key, value);
+        if (strcmp(op_str, "GET") == 0) {
+            assert(ArrowTable_get(&a, key) == value);
+        } else if (strcmp(op_str, "PUT") == 0) {
+            assert(ArrowTable_put(&a, key, value) == 0);
+        } else {
+            assert(0 && "IMPOSSIBLE!");
+        }
+    }
+
+    if ((err = ArrowTable_destroy(&a))) {
+        print_error(err);
         return EXIT_FAILURE;
     }
     print_error(err);
     return 0;
+}
+
+int
+main(void)
+{
+    assert(run_trace() == 0);
 }
 
