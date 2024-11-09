@@ -8,13 +8,13 @@
 #include "arrow.h"
 
 /// @brief  Wrapper around 'perror' and 'strerror' functions.
-void
+static void
 print_error(int const errno_)
 {
     perror(strerror(errno_));
 }
 
-int
+static int
 run_simple_trace()
 {
     int err = 0;
@@ -56,21 +56,24 @@ run_simple_trace()
     return 0;
 }
 
-int
-run_trace()
+static int
+run_trace(char const *const trace_path)
 {
-    char op_str[4];
+    char op_str[4] = {0};
     int key = 0, value = 0;
     int err = 0;
     struct ArrowTable a = {0};
+
+    assert(trace_path != NULL);
 
     if ((err = ArrowTable_init(&a))) {
         print_error(err);
         return err;
     }
 
-    FILE *fp = fopen("trace.txt", "r");
+    FILE *fp = fopen(trace_path, "r");
     if (fp == NULL) {
+        printf("'%s' path DNE\n", trace_path);
         print_error(errno);
         // TODO Reset errno?
         return errno;
@@ -91,7 +94,7 @@ run_trace()
 
     if ((err = ArrowTable_destroy(&a))) {
         print_error(err);
-        return EXIT_FAILURE;
+        return err;
     }
     print_error(err);
     return 0;
@@ -100,6 +103,9 @@ run_trace()
 int
 main(void)
 {
-    assert(run_trace() == 0);
+    if (false)
+        assert(run_simple_trace() == 0);
+    if (true)
+        assert(run_trace("trace.txt") == 0);
 }
 
