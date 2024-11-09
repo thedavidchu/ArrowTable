@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "arrow.h"
+#include "logger.h"
 
 /// @brief  Wrapper around 'perror' and 'strerror' functions.
 static void
@@ -82,7 +83,7 @@ run_trace(char const *const trace_path)
     while (1) {
         if (fscanf(fp, "%3s %d %d", op_str, &key, &value) != 3)
             break;
-        printf("%s, %d, %d\n", op_str, key, value);
+        LOGGER_TRACE("%s, %d, %d", op_str, key, value);
         if (strcmp(op_str, "GET") == 0) {
             assert(ArrowTable_get(&a, key) == value);
         } else if (strcmp(op_str, "PUT") == 0) {
