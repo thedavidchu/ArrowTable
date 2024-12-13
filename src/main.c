@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -102,11 +103,14 @@ run_trace(char const *const trace_path)
 }
 
 int
-main(void)
+main(int argc, char *argv[])
 {
     if (false)
         assert(run_simple_trace() == 0);
     if (true)
-        assert(run_trace("trace.txt") == 0);
+        for (size_t i = 1; i < argc; ++i) {
+            assert(run_trace(argv[i]) == 0);
+        }
+    return 0;
 }
 

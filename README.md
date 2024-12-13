@@ -40,18 +40,25 @@ To generate the trace that the executable will use, run:
 ```bash
 #!/usr/bin/bash
 
-# Generate the trace
-python3 generate_trace.py
+make trace
 ```
+
+To compile the program, run:
 
 ```bash
 #!/usr/bin/bash
 
 # Compile the program
-make
+make build
+```
+
+To run the program, run:
+
+```bash
+#!/usr/bin/bash
 
 # Run the program
-./a.out
+./a.out trace.txt
 ```
 
 To clean up the results, run the following:
