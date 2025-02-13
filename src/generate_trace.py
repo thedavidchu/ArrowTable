@@ -6,6 +6,7 @@
         ("GET", <key>, <expected-value>)
 """
 
+import argparse
 import random
 from pathlib import Path
 
@@ -41,8 +42,13 @@ def write_trace(trace: list[tuple[str, int, int]], path: Path):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "trace", nargs="?", type=Path, default=Path("trace.txt"), help="path to output trace"
+    )
+    args = parser.parse_args()
     trace = generate_trace(0, 100, 1000)
-    write_trace(trace, Path("trace.txt"))
+    write_trace(trace, args.trace)
 
 
 if __name__ == "__main__":
