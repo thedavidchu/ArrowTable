@@ -19,4 +19,3 @@ help:
 	@echo "    - test: execute 'make build; make trace' and run the test executable"
 	@echo "    - clean: remove 'trace.txt' and the executable"
 	@echo "    - help: print this help message"
-

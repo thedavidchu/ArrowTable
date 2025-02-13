@@ -1,15 +1,5 @@
 /** @brief  Logger.
- *  @note   This is based on my On-Line MRC logger, which was based on
- *          this project's original logger. I don't prefix everything
- *          with 'easy' because I want this to be a relatively general-
- *          purpose, standalone file.
- *
- *  ## Change Log
- *  2024-10-11
- *  Added:
- *  - Optionally print new line
- *  - Rigorous error handling of errno
- *  - LOGGER_LEVEL_ALL and LOGGER_LEVEL_NONE
+ *  @note   This is based on my easylib logger.
  */
 #pragma once
 

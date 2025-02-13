@@ -1,5 +1,7 @@
+/** @brief  This is a prototype for the Arrow Table, a modified version of the
+ *          Robinhood Hash Table.
+ */
 #pragma once
-/// @brief  This is a prototype for the Arrow Table, a modified version of the Robinhood Hash Table.
 
 #include <stddef.h>
 #include <stdio.h>
@@ -47,4 +49,3 @@ ArrowTable_put(struct ArrowTable *const me, int const key, int const value);
 /// @return Return 0 on success; other codes result from failure.
 int
 ArrowTable_remove(struct ArrowTable *const me, int const key);
-

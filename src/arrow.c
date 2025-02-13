@@ -375,4 +375,3 @@ ArrowTable_remove(struct ArrowTable *const me, int const key)
 {
     return 0;
 }
-

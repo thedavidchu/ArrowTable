@@ -1,3 +1,11 @@
+#!/usr/bin/python3
+"""
+@brief  Generate a trace with item format:
+        ("PUT", <key>, <value>)
+        or
+        ("GET", <key>, <expected-value>)
+"""
+
 import random
 from pathlib import Path
 
@@ -29,15 +37,13 @@ def generate_trace(seed: int, max_num_unique: int, length: int) -> list[tuple[st
 
 
 def write_trace(trace: list[tuple[str, int, int]], path: Path):
-    with open(path, "w") as f:
-        f.write("\n".join([f"{op_str} {key} {val}" for op_str, key, val in trace]))
+    path.write_text("\n".join([f"{op_str} {key} {val}" for op_str, key, val in trace]))
 
 
 def main():
     trace = generate_trace(0, 100, 1000)
-    write_trace(trace, "trace.txt")
+    write_trace(trace, Path("trace.txt"))
 
 
 if __name__ == "__main__":
     main()
-
